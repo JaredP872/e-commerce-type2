@@ -1,29 +1,36 @@
 import express from "express";
 import cors from "cors";
-import mysql from "mysql2/promise"; // Ensure you're using the correct mysql2 library
+import mysql from "mysql2/promise";
+import path from "path";
+import dotenv from "dotenv";
+
+dotenv.config(); // Load environment variables from a .env file
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors({ origin: "http://localhost:5173" })); // Allow requests from the frontend
+app.use(cors()); // Allow all origins for simplicity (or specify the frontend domain)
 app.use(express.json());
 
-let db; // Declare the database connection variable
+// Serve React build files
+const __dirname = path.resolve();
+app.use(express.static(path.join(__dirname, "dist"))); // Ensure your React app is in the "dist" folder
 
 // MySQL Connection
+let db;
 (async () => {
   try {
     db = await mysql.createConnection({
-      host: "localhost", // or your database host
-      user: "root", // your MySQL username
-      password: "password", // your MySQL password
-      database: "ecommerce", // your MySQL database name
+      host: process.env.DB_HOST, // Use environment variables for production
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
     });
     console.log("Connected to the MySQL database");
   } catch (error) {
     console.error("Error connecting to the database:", error.message);
-    process.exit(1); // Exit the app if the database connection fails
+    process.exit(1);
   }
 })();
 
@@ -31,11 +38,16 @@ let db; // Declare the database connection variable
 app.get("/api/products", async (req, res) => {
   try {
     const [rows] = await db.query("SELECT * FROM products");
-    res.json(rows); // Return the products as JSON
+    res.json(rows);
   } catch (error) {
     console.error("Error fetching products:", error.message);
     res.status(500).json({ error: "Failed to fetch products" });
   }
+});
+
+// Catch-all route to serve the React app
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "index.html"));
 });
 
 // Start the server
